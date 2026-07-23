@@ -1,0 +1,19 @@
+{
+  "@odata.context": "${search_endpoint}/$metadata#datasources/$entity",
+  "name": "${contractid}-datasource",
+  "description": null,
+  "type": "azureblob",
+  "subtype": null,
+  "credentials": {
+    "connectionString": "DefaultEndpointsProtocol=https;AccountName=${blob_account};AccountKey=${blob_key}"
+  },
+  "container": {
+    "name": "${contractid}",
+    "query": null
+  },
+  "dataChangeDetectionPolicy": null,
+  "dataDeletionDetectionPolicy": {
+    "@odata.type": "#Microsoft.Azure.Search.NativeBlobSoftDeleteDeletionDetectionPolicy"
+  },
+  "encryptionKey": null
+}

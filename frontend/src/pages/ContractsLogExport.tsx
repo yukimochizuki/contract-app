@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useEnvironment } from "../environment";
 
 type Contract = {
   _id?: string;
@@ -17,23 +18,29 @@ const ContractsLogExport = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [checked, setChecked] = useState<{ [id: string]: boolean }>({});
-  const baseUrl = import.meta.env.VITE_API_BASE;
+  const baseUrl = import.meta.env.VITE_API_BASE || "/api";
   const [accountInfo, setAccountInfo] = useState("");
   const navigate = useNavigate();
+  const { selectedEnv } = useEnvironment();
 
   useEffect(() => {
-    fetch(`${baseUrl}/getEnv`)
+    fetch(`${baseUrl}/getEnv?selectedEnv=${selectedEnv}`)
       .then((res) => res.json())
       .then((data) => {
         setAccountInfo(`接続先アカウント: ${data.accountName}（${data.env}）`);
       });
-  }, []);
+  }, [baseUrl, selectedEnv]);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`${baseUrl}/getContracts`);
+        const res = await fetch(`${baseUrl}/getContracts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ selectedEnv }),
+        });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch contracts");
         setContracts(data);
       } catch {
         setError("データ取得に失敗しました");
@@ -42,7 +49,7 @@ const ContractsLogExport = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [baseUrl, selectedEnv]);
 
   // チェックボックス切り替え
   const handleCheck = (id: string) => {
@@ -72,6 +79,7 @@ const ContractsLogExport = () => {
         body: JSON.stringify({
           contractIds: selectedIds,
           format: downloadFormat,
+          selectedEnv,
         }),
       });
       if (!res.ok) throw new Error("APIエラー");

@@ -1,0 +1,23 @@
+{
+  "_profile": "development-v3",
+  "subscription": "<development-subscription-id>",
+  "resource_group": "<development-resource-group>",
+  "database_account": "<cosmos-mongodb-account>",
+  "database_connection": "<key-vault-secret>",
+  "database_name": "<database-name>",
+  "search_endpoint": "https://<search-service>.search.windows.net",
+  "search_key": "<key-vault-secret>",
+  "blob_account": "<storage-account>",
+  "blob_key": "<key-vault-secret>",
+  "customskill_endpoint": "https://<custom-skill-host>",
+  "customskill_appid": "<custom-skill-app-id>",
+  "openai_endpoint": "https://<openai-resource>.openai.azure.com",
+  "openai_key": "<key-vault-secret>",
+  "graphrag": false,
+  "graphrag_db_name": "<graphrag-database>",
+  "graphrag_db_connection": "<key-vault-secret>",
+  "chunk_size": 2000,
+  "chunk_overlap": 500,
+  "documentintelligence_name": "<document-intelligence-name>",
+  "documentintelligence_key": "<key-vault-secret>"
+}

@@ -4,39 +4,45 @@ import {
   HttpResponseInit,
   InvocationContext,
 } from "@azure/functions";
-import { MongoClient } from "mongodb";
-import * as dotenv from "dotenv";
-
-dotenv.config();
-const uri = process.env.MONGO_URI!;
-const dbName = "test";
+import { authorizeAdmin } from "../auth/admin";
+import { isContractEnvironment } from "../config/environments";
+import { getConn } from "../config/cosmosDB";
 
 type UpdatePayload = {
   contractId: string;
+  selectedEnv: string;
 };
 
 export async function checkCollection(
   request: HttpRequest,
   context: InvocationContext
 ): Promise<HttpResponseInit> {
-  const body = (await request.json()) as UpdatePayload;
-  const contractId = body.contractId;
+  const authorization = authorizeAdmin(request);
+  if (authorization.response) return authorization.response;
 
-  if (!contractId) {
-    return { status: 400, body: "Missing contractId" };
+  const body = (await request.json()) as UpdatePayload;
+  const { contractId, selectedEnv } = body;
+
+  if (!contractId || !isContractEnvironment(selectedEnv)) {
+    return { status: 400, body: "Missing contractId or selectedEnv" };
   }
 
-  const client = new MongoClient(uri);
-  await client.connect();
-  const db = client.db(dbName);
-  const collections = await db
-    .listCollections({ name: `logs_${contractId}` })
-    .toArray();
-
-  return {
-    status: 200,
-    jsonBody: { exists: collections.length > 0 },
-  };
+  try {
+    const connection = await getConn(selectedEnv);
+    const collections = await connection.db
+      .listCollections({ name: `logs_${contractId}` })
+      .toArray();
+    return {
+      status: 200,
+      jsonBody: { exists: collections.length > 0 },
+    };
+  } catch {
+    context.error("Failed to check collection");
+    return {
+      status: 500,
+      jsonBody: { error: "Failed to check collection" },
+    };
+  }
 }
 
 app.http("checkCollection", {

@@ -1,15 +1,36 @@
 import {
-    app,
-    HttpRequest,
-    HttpResponseInit,
-    InvocationContext,
-  } from "@azure/functions";
-  import { getContractModel } from "../models/contract";
-  import getLogModel from "../models/log";
-  import { stringify } from "csv-stringify/sync";
-  import * as JSZip from "jszip";
-  
-  function flattenAndExpand(obj: any) {
+  app,
+  HttpRequest,
+  HttpResponseInit,
+  InvocationContext,
+} from "@azure/functions";
+import { authorizeAdmin } from "../auth/admin";
+import { isContractEnvironment } from "../config/environments";
+import { getContractModel } from "../models/contract";
+import getLogModel from "../models/log";
+import { stringify } from "csv-stringify/sync";
+import * as JSZip from "jszip";
+
+type ExportLog = {
+  salesforceUserId?: string;
+  created?: string;
+  lastMessageContent?: string;
+  openaiResMessageContent?: string;
+  queryResult?: string;
+  openAiError?: string;
+  openAiErrorParam?: string;
+  contentFilter?: string;
+  feedback?: { evaluation?: string; comment?: string };
+  additionalPrompt?: string;
+  additionalPromptBot?: string;
+  model?: string;
+  systemPrompt?: string;
+  completion_tokens?: number;
+  prompt_tokens?: number;
+  total_tokens?: number;
+};
+
+function flattenAndExpand(obj: ExportLog) {
     return {
       salesforceUserId: obj.salesforceUserId ?? "",
       created: obj.created ?? "",
@@ -29,9 +50,9 @@ import {
       prompt_tokens: obj.prompt_tokens ?? "",
       total_tokens: obj.total_tokens ?? "",
     };
-  }
-  
-  const getAggregationPipeline = () => [
+}
+
+const getAggregationPipeline = () => [
     {
       $project: {
         salesforceUserId: 1,
@@ -60,79 +81,91 @@ import {
         total_tokens: "$openaiRes.usage.total_tokens",
       },
     },
-  ];
-  
-  export async function logExport(
-    request: HttpRequest,
-    context: InvocationContext
-  ): Promise<HttpResponseInit> {
-    try {
-      const requestBody = await request.json();
-      const { contractIds, format } = requestBody as {
-        contractIds: string[];
-        format?: string;
-      };
-  
-      if (!Array.isArray(contractIds)) {
-        return {
-          status: 400,
-          body: JSON.stringify({ error: "contractIds（配列）が必要です" }),
-        };
-      }
-  
-      await getContractModel();
-  
-      // CSVの場合：ZIPを作成
-      if (format === "csv" || format === "json") {
-        const zip = new JSZip();
-        const now = new Date();
-        const yyyymmdd = now.toISOString().slice(0, 10).replace(/-/g, "");
-        const hhmmss = now.toTimeString().slice(0, 8).replace(/:/g, "");
-      
-        for (const contractId of contractIds) {
-          try {
-            const LogModel = await getLogModel(contractId);
-            const results = await LogModel.aggregate(getAggregationPipeline()).exec();
-      
-            if (format === "csv") {
-              const flatResults = results.map(flattenAndExpand);
-              const csv = stringify(flatResults, { header: true });
-              const fileName = `logs_${contractId}_${yyyymmdd}_${hhmmss}.csv`;
-              zip.file(fileName, csv);
-            } else {
-              // JSONファイル
-              const fileName = `logs_${contractId}_${yyyymmdd}_${hhmmss}.json`;
-              zip.file(fileName, JSON.stringify(results, null, 2));
-            }
-          } catch (err) {
-            context.log(`Warning: コレクションlogs_${contractId}でエラー: ${err}`);
-          }
-        }
-      
-        const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
-        return {
-          status: 200,
-          headers: {
-            "Content-Type": "application/zip",
-            "Content-Disposition": `attachment; filename=logs_${yyyymmdd}_${hhmmss}.zip`,
-            "Access-Control-Expose-Headers": "Content-Disposition",
-            "Access-Control-Allow-Origin": "*",
-          },
-          body: zipBuffer,
-        };
-      }
-    } catch (err) {
-      context.log("ログダウンロードAPIエラー:", err);
+];
+
+export async function logExport(
+  request: HttpRequest,
+  context: InvocationContext
+): Promise<HttpResponseInit> {
+  const authorization = authorizeAdmin(request);
+  if (authorization.response) return authorization.response;
+
+  try {
+    const requestBody = await request.json();
+    const { contractIds, format, selectedEnv } = requestBody as {
+      contractIds: string[];
+      format?: string;
+      selectedEnv?: string;
+    };
+
+    if (!Array.isArray(contractIds) || !isContractEnvironment(selectedEnv)) {
       return {
-        status: 500,
-        jsonBody: { error: "ログダウンロードに失敗しました" },
+        status: 400,
+        jsonBody: { error: "contractIds and selectedEnv are required" },
       };
     }
+
+    if (format !== "csv" && format !== "json") {
+      return {
+        status: 400,
+        jsonBody: { error: "format must be csv or json" },
+      };
+    }
+
+    await getContractModel(selectedEnv);
+    const zip = new JSZip();
+    const now = new Date();
+    const yyyymmdd = now.toISOString().slice(0, 10).replace(/-/g, "");
+    const hhmmss = now.toTimeString().slice(0, 8).replace(/:/g, "");
+
+    for (const contractId of contractIds) {
+      try {
+        const LogModel = await getLogModel(contractId, selectedEnv);
+        const results = await LogModel.aggregate<ExportLog>(
+          getAggregationPipeline()
+        ).exec();
+        const safeContractId = contractId.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+        if (format === "csv") {
+          const flatResults = results.map(flattenAndExpand);
+          const csv = stringify(flatResults, { header: true });
+          zip.file(
+            `logs_${safeContractId}_${yyyymmdd}_${hhmmss}.csv`,
+            csv
+          );
+        } else {
+          zip.file(
+            `logs_${safeContractId}_${yyyymmdd}_${hhmmss}.json`,
+            JSON.stringify(results, null, 2)
+          );
+        }
+      } catch {
+        context.warn(`Log export skipped for contract ${contractId}`);
+      }
+    }
+
+    const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+    return {
+      status: 200,
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename=logs_${yyyymmdd}_${hhmmss}.zip`,
+        "Access-Control-Expose-Headers": "Content-Disposition",
+      },
+      body: zipBuffer,
+    };
+  } catch {
+    context.error("Log export failed");
+    return {
+      status: 500,
+      jsonBody: { error: "ログダウンロードに失敗しました" },
+    };
   }
-  
-  app.http("logExport", {
-    methods: ["POST"],
-    authLevel: "anonymous",
-    handler: logExport,
-  });
+}
+
+app.http("logExport", {
+  methods: ["POST"],
+  authLevel: "anonymous",
+  handler: logExport,
+});
   

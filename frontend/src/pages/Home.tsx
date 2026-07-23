@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEnvironment, type EnvType } from "../environment";
 
 const environments = [
   { label: "開発環境1", value: "dev1" },
@@ -10,13 +10,7 @@ const environments = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const [selectedEnv, setSelectedEnv] = useState(() => {
-    return localStorage.getItem("selectedEnv") || "dev1";
-  });
-
-  useEffect(() => {
-    localStorage.setItem("selectedEnv", selectedEnv);
-  }, [selectedEnv]);
+  const { selectedEnv, setSelectedEnv } = useEnvironment();
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-6">
@@ -28,7 +22,7 @@ export default function Home() {
           <select
             className="border border-gray-300 px-4 py-2 rounded w-full sm:w-1/2"
             value={selectedEnv}
-            onChange={(e) => setSelectedEnv(e.target.value)}
+            onChange={(e) => setSelectedEnv(e.target.value as EnvType)}
           >
             {environments.map((env) => (
               <option key={env.value} value={env.value}>

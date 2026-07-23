@@ -1,5 +1,6 @@
 import { type HydratedDocumentFromSchema, Schema, Model } from "mongoose";
-import { LRUCache } from 'lru-cache'
+import { createHash } from "crypto";
+import { LRUCache } from "lru-cache";
 import { getConn } from "../config/cosmosDB";
 
 const logSchema = new Schema({
@@ -94,16 +95,25 @@ logSchema.index({ createdAt: 1, _id: 1 });
 // LRUキャッシュ（Model<LogDocument>型で）
 const cache = new LRUCache<string, Model<LogDocument>>({ max: 20 });
 
-// contractIdごとに物理分割されたコレクションのモデル取得
-export async function getLogModel(contractId: string): Promise<Model<LogDocument>> {
-  let logModel = cache.get(contractId);
+export async function getLogModel(
+  contractId: string,
+  selectedEnv: string
+): Promise<Model<LogDocument>> {
+  const cacheKey = `${selectedEnv}:${contractId}`;
+  let logModel = cache.get(cacheKey);
   if (!logModel) {
-    const conn = await getConn();
-    logModel = conn.model<LogDocument>("Log", logSchema, `logs_${contractId}`);
-    cache.set(contractId, logModel);
-    // Index生成は不要 or どうしても必要なら下記
-    logModel.ensureIndexes({ background: true }).catch((err) => {
-      console.error("Index creation error:", err);
+    const conn = await getConn(selectedEnv);
+    const modelKey = createHash("sha256")
+      .update(cacheKey)
+      .digest("hex")
+      .slice(0, 16);
+    const modelName = `Log_${modelKey}`;
+    logModel =
+      (conn.models[modelName] as Model<LogDocument> | undefined) ??
+      conn.model<LogDocument>(modelName, logSchema, `logs_${contractId}`);
+    cache.set(cacheKey, logModel);
+    logModel.ensureIndexes({ background: true }).catch(() => {
+      console.error("Log index creation failed");
     });
   }
   return logModel;

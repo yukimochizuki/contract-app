@@ -1,27 +1,31 @@
 import mongoose from "mongoose";
 
-let conn: mongoose.Connection | null = null;
+const connections = new Map<string, mongoose.Connection>();
 
-// 1. コネクションの取得
 export async function getConn(env: string = "prod"): Promise<mongoose.Connection> {
-
   const uri = process.env[`MONGO_URI_${env.toUpperCase()}`];
   if (!uri) throw new Error(`MONGO_URI_${env.toUpperCase()} is not set`);
 
-  // 1. コネクションが存在し、状態が1（接続中）ならそれを返す
-  if (conn && conn.readyState === 1) return conn;
-  if (!conn) {
-    // 2. コネクションが存在しない場合は新たに作成
-    conn = mongoose.createConnection(uri, {
-      dbName: "test",
-      maxPoolSize: 1
-    });
-    await new Promise((resolve, reject) => {
-      conn!.once("open", resolve);
-      conn!.once("error", reject);
-    });
-    conn.on("connected", () => console.log("✅ Mongoose connected"));
-    conn.on("error", (err) => console.error("❌ Mongoose connection error:", err));
+  const existing = connections.get(env);
+  if (existing?.readyState === 1) return existing;
+  if (existing?.readyState === 2) {
+    await existing.asPromise();
+    return existing;
   }
-  return conn;
+  if (existing) {
+    await existing.close();
+    connections.delete(env);
+  }
+
+  const connection = mongoose.createConnection(uri, {
+    dbName:
+      process.env[`MONGO_DB_NAME_${env.toUpperCase()}`] ??
+      process.env.MONGO_DB_NAME ??
+      "test",
+    maxPoolSize: 1,
+  });
+  connections.set(env, connection);
+
+  await connection.asPromise();
+  return connection;
 }
