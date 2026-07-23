@@ -4,32 +4,30 @@
   "description": "",
   "main": "dist/src/functions/*.js",
   "scripts": {
-    "build": "tsc",
+    "build": "rimraf dist && tsc",
     "watch": "tsc -w",
     "clean": "rimraf dist",
-    "prestart": "npm run clean && npm run build",
+    "prestart": "npm run build",
     "start": "func start",
     "test": "echo \"No tests yet...\""
   },
   "dependencies": {
-    "": "file:",
     "@azure/cosmos": "^4.4.0",
     "@azure/functions": "^4.7.2",
+    "@azure/identity": "4.13.1",
     "csv-stringify": "^6.5.2",
     "date-fns-tz": "^3.2.0",
     "dayjs": "^1.11.13",
-    "dotenv": "^16.5.0",
     "jszip": "^3.10.1",
     "mongoose": "^7.6.3",
     "zod": "^3.24.4"
   },
   "devDependencies": {
     "@types/csv-stringify": "^1.4.3",
-    "@types/dotenv": "^6.1.1",
     "@types/jszip": "^3.4.0",
     "@types/mongoose": "^5.11.96",
     "@types/node": "18.x",
-    "azure-functions-core-tools": "^4.x",
+    "azure-functions-core-tools": "4.0.7030",
     "rimraf": "^5.0.0",
     "typescript": "^5.4.5"
   }

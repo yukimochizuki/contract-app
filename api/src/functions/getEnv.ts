@@ -1,4 +1,6 @@
 import { app, HttpRequest, HttpResponseInit } from "@azure/functions";
+import { authorizeAdmin } from "../auth/admin";
+import { isContractEnvironment } from "../config/environments";
 
 function extractAccountName(uri: string): string {
   try {
@@ -18,16 +20,32 @@ function extractAccountName(uri: string): string {
   }
 }
 
-export async function getEnv(): Promise<HttpResponseInit> {
-  const uri = process.env.MONGO_URI!;
+export async function getEnv(request: HttpRequest): Promise<HttpResponseInit> {
+  const authorization = authorizeAdmin(request);
+  if (authorization.response) return authorization.response;
+
+  const selectedEnv = request.query.get("selectedEnv");
+  if (!isContractEnvironment(selectedEnv)) {
+    return {
+      status: 400,
+      jsonBody: { error: "Invalid or missing selectedEnv" },
+    };
+  }
+
+  const uri = process.env[`MONGO_URI_${selectedEnv.toUpperCase()}`];
+  if (!uri) {
+    return {
+      status: 503,
+      jsonBody: { error: `MONGO_URI_${selectedEnv.toUpperCase()} is not configured` },
+    };
+  }
   const accountName = extractAccountName(uri);
-  const env = process.env.APP_ENV || "unknown";
 
   return {
     status: 200,
     jsonBody: {
       accountName,
-      env
+      env: selectedEnv,
     }
   };
 }

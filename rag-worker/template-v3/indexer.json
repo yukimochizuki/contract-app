@@ -1,0 +1,31 @@
+{
+  "@odata.context": "${search_endpoint}/$metadata#indexers/$entity",
+  "name": "${contractid}-indexer",
+  "description": null,
+  "dataSourceName": "${contractid}-datasource",
+  "skillsetName": "${contractid}-skillset",
+  "targetIndexName": "${contractid}",
+  "disabled": null,
+  "schedule": null,
+  "parameters": {
+    "batchSize": null,
+    "maxFailedItems": null,
+    "maxFailedItemsPerBatch": null,
+    "base64EncodeKeys": null,
+    "configuration": {
+      "dataToExtract": "contentAndMetadata",
+      "parsingMode": "default",
+      "imageAction": "generateNormalizedImages",
+      "allowSkillsetToReadFileData": true
+    }
+  },
+  "fieldMappings": [
+    {
+      "sourceFieldName": "metadata_storage_name",
+      "targetFieldName": "title",
+      "mappingFunction": null
+    }
+  ],
+  "outputFieldMappings": [],
+  "encryptionKey": null
+}

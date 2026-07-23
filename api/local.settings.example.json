@@ -1,0 +1,26 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "node",
+    "AZURE_FUNCTIONS_ENVIRONMENT": "Development",
+    "ALLOW_LOCAL_ADMIN": "true",
+    "ADMIN_USERS": "",
+    "MONGO_URI_DEV1": "",
+    "MONGO_URI_DEV2": "",
+    "MONGO_URI_DEV3": "",
+    "MONGO_URI_PROD": "",
+    "MONGO_DB_NAME": "test",
+    "RAG_CONTAINER_APP_JOB_RESOURCE_ID": "/subscriptions/<id>/resourceGroups/<group>/providers/Microsoft.App/jobs/<job>",
+    "RAG_WORKER_IMAGE": "<registry>/<image>:<version>",
+    "RAG_WORKER_CONTAINER_NAME": "rag-provisioning",
+    "RAG_WORKER_CPU": "0.5",
+    "RAG_WORKER_MEMORY": "1Gi",
+    "RAG_DEV_CONFIG_SECRET": "mitoco-ai-rag-dev-v3",
+    "RAG_DEV_SUBSCRIPTION_ID": "<development-subscription-id>",
+    "RAG_DEV_RESOURCE_GROUP": "<development-resource-group>",
+    "RAG_REQUEST_DB_SECRET_DEV1": "contract-db-dev1",
+    "RAG_REQUEST_DB_SECRET_DEV2": "contract-db-dev2",
+    "RAG_REQUEST_DB_SECRET_DEV3": "contract-db-dev3",
+    "RAG_REQUEST_DATABASE_NAME": "test"
+  }
+}

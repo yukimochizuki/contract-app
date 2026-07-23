@@ -1,27 +1,27 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { z } from "zod";
+import { authorizeAdmin } from "../auth/admin";
+import { contractEnvironments } from "../config/environments";
 import { getContractModel } from "../models/contract";
 
-type UpdatePayload = {
-  _id: string;
-  points: number;
-};
+const UpdatePayloadSchema = z.object({
+  selectedEnv: z.enum(contractEnvironments),
+  _id: z.string().min(1),
+  points: z.number().int().nonnegative(),
+});
 
 export async function updateContract(
   request: HttpRequest,
   context: InvocationContext
 ): Promise<HttpResponseInit> {
+  const authorization = authorizeAdmin(request);
+  if (authorization.response) return authorization.response;
+
   try {
-    const body = await request.json() as UpdatePayload;
-    const { _id, points } = body;
+    const body = UpdatePayloadSchema.parse(await request.json());
+    const { selectedEnv, _id, points } = body;
 
-    if (!_id || points == null) {
-      return {
-        status: 400,
-        body: "Missing _id or points"
-      };
-    }
-
-    const ContractModel = await getContractModel();
+    const ContractModel = await getContractModel(selectedEnv);
     const updated = await ContractModel.findByIdAndUpdate(
       _id,
       { $set: { points } },
@@ -39,8 +39,14 @@ export async function updateContract(
       status: 200,
       jsonBody: updated
     };
-  } catch (err) {
-    context.log("Error updating contract:", err);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return {
+        status: 400,
+        jsonBody: { error: "Invalid request", details: error.issues },
+      };
+    }
+    context.error("Error updating contract");
     return {
       status: 500,
       body: "Error updating contract"

@@ -41,13 +41,15 @@ contractSchema.pre("save", function (next) {
   next();
 });
 
-// 3. モデルのキャッシュ
-let _model: Model<IContract> | null = null;
+const models = new Map<string, Model<IContract>>();
 
-// 4. モデル取得関数（conn取得はawaitで!）
 export async function getContractModel(selectedEnv: string): Promise<Model<IContract>> {
-  if (_model) return _model;
+  const existing = models.get(selectedEnv);
+  if (existing) return existing;
+
   const conn = await getConn(selectedEnv);
-  _model = conn.model<IContract>("Contract", contractSchema);
-  return _model;
+  const model = conn.models.Contract as Model<IContract> | undefined;
+  const contractModel = model ?? conn.model<IContract>("Contract", contractSchema);
+  models.set(selectedEnv, contractModel);
+  return contractModel;
 }

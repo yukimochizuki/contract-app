@@ -1,21 +1,16 @@
-import { createContext, useContext, useState } from "react";
+import { useState } from "react";
 import type { ReactNode } from "react";
-
-type EnvType = "dev1" | "dev2" | "dev3" | "prod";
-
-const EnvironmentContext = createContext<{
-  selectedEnv: EnvType;
-  setSelectedEnv: (env: EnvType) => void;
-}>({
-  selectedEnv: "dev1",
-  setSelectedEnv: () => {},
-});
-
-export const useEnvironment = () => useContext(EnvironmentContext);
+import { EnvironmentContext, type EnvType } from "./environment";
 
 export function EnvironmentProvider({ children }: { children: ReactNode }) {
   const [selectedEnv, setSelectedEnv] = useState<EnvType>(() => {
-    return (localStorage.getItem("selectedEnv") as EnvType) || "dev1";
+    const saved = localStorage.getItem("selectedEnv");
+    return saved === "dev1" ||
+      saved === "dev2" ||
+      saved === "dev3" ||
+      saved === "prod"
+      ? saved
+      : "dev1";
   });
 
   // ローカルストレージに保存

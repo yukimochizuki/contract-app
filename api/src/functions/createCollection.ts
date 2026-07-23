@@ -1,33 +1,36 @@
 import { app, HttpRequest, HttpResponseInit } from "@azure/functions";
-import { getLogModel } from "../models/log"; // ★ 必ずasync関数でexport
 import { z } from "zod";
+import { authorizeAdmin } from "../auth/admin";
+import { contractEnvironments } from "../config/environments";
+import { getLogModel } from "../models/log";
 
-// 型定義
 const CreateCollectionSchema = z.object({
   contractId: z.string().min(1, "contractId is required"),
+  selectedEnv: z.enum(contractEnvironments),
 });
-
-type CreateCollectionRequest = z.infer<typeof CreateCollectionSchema>;
 
 export async function createCollection(
   request: HttpRequest
 ): Promise<HttpResponseInit> {
+  const authorization = authorizeAdmin(request);
+  if (authorization.response) return authorization.response;
+
   try {
     const json = await request.json();
-    const body = CreateCollectionSchema.parse(json); // バリデーション
-    const { contractId } = body;
+    const body = CreateCollectionSchema.parse(json);
+    const { contractId, selectedEnv } = body;
 
-    await getLogModel(contractId); // ← await必須
+    await getLogModel(contractId, selectedEnv);
 
     return {
       status: 201,
       body: "Collection created",
     };
-  } catch (err: any) {
-    if (err.name === "ZodError") {
+  } catch (error) {
+    if (error instanceof z.ZodError) {
       return {
         status: 400,
-        jsonBody: { error: "Invalid request", details: err.errors },
+        jsonBody: { error: "Invalid request", details: error.issues },
       };
     }
 

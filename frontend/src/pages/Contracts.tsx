@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useEnvironment } from "../EnvironmentContext";
+import { useEnvironment } from "../environment";
 
 type Contract = {
   _id?: string;
@@ -26,33 +26,17 @@ const Contracts = () => {
   const navigate = useNavigate();
   const { selectedEnv } = useEnvironment();
 
-  const baseUrl = import.meta.env.VITE_API_BASE;
+  const baseUrl = import.meta.env.VITE_API_BASE || "/api";
 
   const [accountInfo, setAccountInfo] = useState("");
 
   useEffect(() => {
-    fetch(`${baseUrl}/getEnv`)
+    fetch(`${baseUrl}/getEnv?selectedEnv=${selectedEnv}`)
       .then((res) => res.json())
       .then((data) => {
         setAccountInfo(`接続先アカウント: ${data.accountName}（${data.env}）`);
       });
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch(`${baseUrl}/getContracts`);
-        const data = await res.json();
-        setContracts(data);
-      } catch (err: unknown) {
-        console.error("Failed to fetch contracts:", err);
-        setError("データ取得に失敗しました");
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+  }, [baseUrl, selectedEnv]);
 
   type CollectionStatus = "checking" | "exists" | "missing";
 
@@ -69,6 +53,7 @@ const Contracts = () => {
           body: JSON.stringify({ selectedEnv }), // ← ここで送る！
         });
         const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Failed to fetch contracts");
         setContracts(data);
 
         // ✅ 初期状態で「checking」をセット（これが抜けている）
@@ -85,13 +70,11 @@ const Contracts = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [baseUrl, selectedEnv]);
 
   useEffect(() => {
     const checkCollections = async () => {
-      const updatedMap: Record<string, CollectionStatus> = {
-        ...collectionStatusMap,
-      };
+      const updatedMap: Record<string, CollectionStatus> = {};
 
       await Promise.all(
         contracts.map(async (contract) => {
@@ -99,7 +82,10 @@ const Contracts = () => {
             const res = await fetch(`${baseUrl}/checkCollection`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ contractId: contract.contractId }),
+              body: JSON.stringify({
+                contractId: contract.contractId,
+                selectedEnv,
+              }),
             });
             const result = await res.json();
             updatedMap[contract.contractId] = result.exists
@@ -117,7 +103,7 @@ const Contracts = () => {
     if (contracts.length > 0) {
       checkCollections();
     }
-  }, [contracts]);
+  }, [baseUrl, contracts, selectedEnv]);
 
   const handleUpdate = async (_id: string, points: number) => {
     const confirmed = window.confirm("この契約のポイントを更新しますか？");
@@ -127,7 +113,7 @@ const Contracts = () => {
       const res = await fetch(`${baseUrl}/updateContract`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ _id, points }),
+        body: JSON.stringify({ selectedEnv, _id, points }),
       });
       if (res.ok) {
         const updated = contracts.map((c) =>
@@ -157,6 +143,7 @@ const Contracts = () => {
 
       const payload = {
         ...newContract,
+        selectedEnv,
         startDate: startTimestamp,
         endDate: endTimestamp,
       };
@@ -193,7 +180,7 @@ const Contracts = () => {
       const res = await fetch(`${baseUrl}/createCollection`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId }),
+        body: JSON.stringify({ contractId, selectedEnv }),
       });
 
       if (res.ok) {
