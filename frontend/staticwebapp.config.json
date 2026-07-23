@@ -1,19 +1,7 @@
 {
   "routes": [
     {
-      "route": "/contracts*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/ContractsLogExport*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/RagSetupForm*",
-      "allowedRoles": ["authenticated"]
-    },
-    {
-      "route": "/api/*",
+      "route": "/*",
       "allowedRoles": ["authenticated"]
     }
   ],
